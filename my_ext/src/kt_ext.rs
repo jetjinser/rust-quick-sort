@@ -73,14 +73,14 @@ impl QuickSort for Vec<i32> {
     fn quick_sort(self, ascending: bool) -> Vec<i32> {
         match self.len() {
             0 => Vec::new(),
-            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x).let_owned(|(less, mut equal, greater): (Vec<i32>, Vec<i32>, Vec<i32>)| {
+            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x)).let_owned(|(less, mut equal, greater): (Vec<i32>, Vec<i32>, Vec<i32>)| {
                 let mut small = less.quick_sort(ascending);
                 let mut big = greater.quick_sort(ascending);
                 match ascending {
                     true => small.also_mut(|v| v.append(&mut equal)).also_mut(|v| v.append(&mut big)),
                     false => big.also_mut(|v| v.append(&mut equal)).also_mut(|v| v.append(&mut small))
                 }
-            }))
+            })
         }
     }
 }
