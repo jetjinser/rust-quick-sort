@@ -1,3 +1,6 @@
+use rayon::join;
+use std::{fmt::Debug, marker::Send};
+
 pub trait KtStd {
     fn let_ref<R>(&self, block: impl FnOnce(&Self) -> R) -> R {
         block(self)
@@ -27,20 +30,25 @@ pub trait KtStd {
         self
     }
 
-    fn sout(self) -> Self where Self: Sized + std::fmt::Debug {
+    fn also_mut_once(mut self, block: impl FnOnce(&mut Self)) -> Self where Self: Sized {
+        block(&mut self);
+        self
+    }
+
+    fn sout(self) -> Self where Self: Debug + Sized {
         dbg!(self)
     }
 
-    fn print(self) -> Self where Self: Sized + std::fmt::Debug {
+    fn print(self) -> Self where Self: Debug + Sized {
         self.also_ref(|s| println!("{:#?}", s))
     }
 
-    fn echo(self) -> Self where Self: Sized + std::fmt::Debug {
+    fn echo(self) -> Self where Self: Debug + Sized {
         self.also_ref(|s| println!("{:?}", s))
     }
 }
 
-impl <T> KtStd for T {}
+impl<T> KtStd for T {}
 
 pub trait IterExt<T> {
     fn on_each(self, f: impl Fn(&mut T)) -> Self;
@@ -65,22 +73,54 @@ impl<T> IterExt<T> for Vec<T> {
     }
 }
 
-pub trait QuickSort {
-    fn quick_sort(self, ascending: bool) -> Vec<i32>;
+pub trait QuickSort<T> {
+    fn quick_sort(self) -> Vec<T>;
+    fn quick_sort_rev(self) -> Vec<T>;
 }
 
-impl QuickSort for Vec<i32> {
-    fn quick_sort(self, ascending: bool) -> Vec<i32> {
+impl<T: Ord + Copy> QuickSort<T> for Vec<T> {
+    fn quick_sort(self) -> Vec<T> {
         match self.len() {
-            0 => Vec::new(),
-            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x)).let_owned(|(less, mut equal, greater): (Vec<i32>, Vec<i32>, Vec<i32>)| {
-                let mut small = less.quick_sort(ascending);
-                let mut big = greater.quick_sort(ascending);
-                match ascending {
-                    true => small.also_mut(|v| v.append(&mut equal)).also_mut(|v| v.append(&mut big)),
-                    false => big.also_mut(|v| v.append(&mut equal)).also_mut(|v| v.append(&mut small))
-                }
-            })
+            0 | 1 => self,
+            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x)).let_owned(|(less, mut equal, greater): (Vec<T>, Vec<T>, Vec<T>)|
+                    less.quick_sort().also_mut(|v| v.append(&mut equal)).also_mut_once(|v| v.append(&mut greater.quick_sort()))
+                )
+        }
+    }
+
+    fn quick_sort_rev(self) -> Vec<T> {
+        match self.len() {
+            0 | 1 => self,
+            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x)).let_owned(|(less, mut equal, greater): (Vec<T>, Vec<T>, Vec<T>)|
+                    greater.quick_sort_rev().also_mut(|v| v.append(&mut equal)).also_mut_once(|v| v.append(&mut less.quick_sort_rev()))
+                )
+        }
+    }
+}
+
+pub trait QSortP<T> {
+    fn qsort_p(self) -> Vec<T>;
+    fn qsort_p_rev(self) -> Vec<T>;
+}
+
+impl<T> QSortP<T> for Vec<T> where T: Ord + Copy + Send {
+    fn qsort_p(self) -> Vec<T> {
+        match self.len() {
+            0 | 1 => self,
+            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x)).let_owned(|(less, mut equal, greater): (Vec<T>, Vec<T>, Vec<T>)|
+                    join(|| less.qsort_p(), || greater.qsort_p())
+                        .let_owned(|(small, mut big)| small.also_mut(|v| v.append(&mut equal)).also_mut(|v| v.append(&mut big)))
+                )
+        }
+    }
+
+    fn qsort_p_rev(self) -> Vec<T> {
+        match self.len() {
+            0 | 1 => self,
+            _ => self[0].let_owned(|x| self.thertation(|e| e < &x, |e| e == &x)).let_owned(|(less, mut equal, greater): (Vec<T>, Vec<T>, Vec<T>)|
+                    join(|| less.qsort_p_rev(), || greater.qsort_p_rev())
+                        .let_owned(|(mut small, big)| big.also_mut(|v| v.append(&mut equal)).also_mut(|v| v.append(&mut small)))
+                    )
         }
     }
 }
