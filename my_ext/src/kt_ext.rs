@@ -64,11 +64,11 @@ impl<T> IterExt<T> for Vec<T> {
         let mut first = vec![];
         let mut second = vec![];
         let mut third = vec![];
-        self.into_iter().for_each(|e|
+        for e in self {
             if predicate1(&e) { first.push(e) }
             else if predicate2(&e) { second.push(e) }
             else { third.push(e) }
-        );
+        }
         (first, second, third)
     }
 }
